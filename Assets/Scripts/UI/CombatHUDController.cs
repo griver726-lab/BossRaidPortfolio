@@ -14,6 +14,7 @@ namespace Core.UI
     public class CombatHUDController : MonoBehaviour
     {
         private const string PartnerHudPanelName = "PartnerHUD_Panel";
+        private const string ComboRootName = "Text_Combo";
 
         [Header("플레이어 HUD")]
         [SerializeField] private Image _playerTorsoImage;
@@ -37,6 +38,9 @@ namespace Core.UI
         [SerializeField, Min(1f)] private float _hitScale = 1.15f;
         [SerializeField, Min(0.05f)] private float _feedbackDuration = 0.3f;
 
+        [Header("콤보 UI")]
+        [SerializeField] private TMP_Text _comboText;
+
         [Header("데이터 소스 (선택)")]
         [SerializeField] private Health _playerHealthSource;
         [SerializeField] private Health _bossHealthSource;
@@ -48,6 +52,9 @@ namespace Core.UI
         private Vector3 _damageFeedbackBaseScale = Vector3.one;
         private bool _isHudVisible = true;
         private bool _isPartnerHudVisible;
+        private GameObject _comboRoot;
+        private bool _isComboVisible;
+        private int _currentComboStep = 1;
 
         public Health PlayerHealth => _playerHealth;
         public Health BossHealth => _bossHealth;
@@ -57,6 +64,8 @@ namespace Core.UI
             ApplyNameLabels();
             ResolvePartnerHudRoot();
             ApplyPartnerHudVisibility();
+            ResolveComboText();
+            HideComboImmediate();
 
             if (_damageFeedbackText != null)
             {
@@ -71,6 +80,7 @@ namespace Core.UI
         private void Start()
         {
             HideDamageFeedbackImmediate();
+            HideComboImmediate();
 
             // 인스펙터로 체력 참조를 미리 연결한 경우 시작 시 자동 바인딩한다.
             if (_playerHealthSource != null || _bossHealthSource != null)
@@ -83,6 +93,7 @@ namespace Core.UI
         {
             UnbindHealthEvents();
             HideDamageFeedbackImmediate();
+            HideComboImmediate();
         }
 
         /// <summary>
@@ -258,6 +269,33 @@ namespace Core.UI
         }
 
         /// <summary>
+        /// 현재 콤보 단계를 HUD에 표시한다.
+        /// 콤보 중에만 보이고, 일반 상태에서는 숨김을 유지한다.
+        /// </summary>
+        public void ShowCombo(int comboStep)
+        {
+            ResolveComboText();
+            if (_comboText == null)
+            {
+                return;
+            }
+
+            _currentComboStep = Mathf.Max(1, comboStep);
+            _comboText.text = _currentComboStep.ToString();
+            _isComboVisible = true;
+            ApplyComboVisibility();
+        }
+
+        /// <summary>
+        /// 콤보 표시를 즉시 숨긴다.
+        /// </summary>
+        public void HideCombo()
+        {
+            _isComboVisible = false;
+            ApplyComboVisibility();
+        }
+
+        /// <summary>
         /// 고정 위치 데미지 피드백 텍스트를 표시한다.
         /// 적중 시에만 텍스트를 노출하고, 짧은 페이드 아웃을 적용한다.
         /// </summary>
@@ -325,6 +363,11 @@ namespace Core.UI
             if (!visible)
             {
                 HideDamageFeedbackImmediate();
+                HideComboImmediate();
+            }
+            else
+            {
+                ApplyComboVisibility();
             }
         }
 
@@ -371,6 +414,45 @@ namespace Core.UI
             }
 
             _partnerHudRoot.SetActive(_isHudVisible && _isPartnerHudVisible);
+        }
+
+        private void ResolveComboText()
+        {
+            if (_comboText != null)
+            {
+                _comboRoot = _comboText.gameObject;
+                return;
+            }
+
+            Transform[] childTransforms = GetComponentsInChildren<Transform>(true);
+            for (int i = 0; i < childTransforms.Length; i++)
+            {
+                Transform childTransform = childTransforms[i];
+                if (childTransform == null || !string.Equals(childTransform.name, ComboRootName, System.StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                _comboText = childTransform.GetComponent<TMP_Text>();
+                _comboRoot = childTransform.gameObject;
+                break;
+            }
+        }
+
+        private void ApplyComboVisibility()
+        {
+            ResolveComboText();
+            if (_comboRoot == null)
+            {
+                return;
+            }
+
+            if (_comboText != null && _isComboVisible)
+            {
+                _comboText.text = _currentComboStep.ToString();
+            }
+
+            _comboRoot.SetActive(_isHudVisible && _isComboVisible);
         }
 
         private IEnumerator PlayDamageFeedbackRoutine()
@@ -420,5 +502,16 @@ namespace Core.UI
             _damageFeedbackText.color = resetColor;
         }
 
+        private void HideComboImmediate()
+        {
+            _isComboVisible = false;
+            ResolveComboText();
+            if (_comboRoot == null)
+            {
+                return;
+            }
+
+            _comboRoot.SetActive(false);
+        }
     }
 }

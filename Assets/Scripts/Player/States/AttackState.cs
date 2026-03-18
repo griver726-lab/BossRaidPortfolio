@@ -69,6 +69,7 @@ namespace Core.Player.States
 
             // 방향 보정
             RotateToCamera();
+            Controller.SetPendingComboHudStep(_comboIndex + 1);
         }
 
         public override void Update(PlayerInputPacket input)
@@ -156,6 +157,7 @@ namespace Core.Player.States
         {
             // 상태가 비정상 종료되어도 공격 판정이 남지 않도록 강제 종료한다.
             Controller.OnHitEnd();
+            Controller.HideComboHud();
             _comboIndex = 0;
             _reserveNextCombo = false;
         }

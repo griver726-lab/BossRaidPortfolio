@@ -1,4 +1,4 @@
-# 🗂️ Milestone Backlog
+﻿# 🗂️ Milestone Backlog
 
 이 문서는 마일스톤 진행 현황, 버그, 폴리싱 항목을 관리하는 백로그 전용 문서입니다.
 
@@ -102,9 +102,6 @@
 - [x] 🟡**(개발, 버전관리) 메인 배포**: develop branch 내용 main에 커밋 및 푸시
 - [x] 🟡**(개발, 멀티플레이) 계획 쓰기**: 어떤 멀티플레이를 구현할 건지 계획 작성.
 
-#### 🚧 폴리싱
-- [x] 🟡**(보스, attack1) 준비동작 수치조절**: 인스펙터에서 준비 시간 & 어느 동작까지가 준비동작인지 인스펙터에서 조절 가능하게 만들기
-
 #### 멀티플레이어
 [x] `TitleScene` 멀티플레이 UI 구조 설계 확정
 
@@ -112,8 +109,18 @@
 
 ### 7주차: 멀티플레이 구현
 
+- [x] 맵 & UI 본게임에 합치기
+- [x] 파트너 UI 멀티일 때만 뜨게 하기
+- [ ] 콤보 평소에는 끄고 있다가 콤보일때만 켜기
+- [ ] 결과 후 승리/패배 나오게 하기
+- [ ] 맵 장애물들을 용이 무시하게 하기 (길찾기 또는 장애물을 통과하게 하기)
+
+
 #### 🚧 버그
 - [x] 🟢**(보스, 공격범위)**: Attack1 editable range source를 `HeadDamageCaster.radius`로 단일화하고, `BossController.basicAttackRange`는 인스펙터에서 숨김 + legacy fallback으로만 유지.
+
+#### 🚧 폴리싱
+- [x] 🟡**(보스, attack1) 준비동작 수치조절**: 인스펙터에서 준비 시간 & 어느 동작까지가 준비동작인지 인스펙터에서 조절 가능하게 만들기
 
 #### 멀티플레이어
 - [ ] NGO/UTP/Relay/Lobby 패키지 및 서비스 초기화
@@ -123,11 +130,18 @@
 #### 멀티플레이어
 1. [x] `TitleScene` 멀티플레이 UI 구조 설계 확정
 2. [ ] NGO/UTP/Relay/Lobby 패키지 및 서비스 초기화
+2.1 [x] package 준비 세션
+2.2 [x] UGS bootstrap 세션
+2.3 [x] Host create 세션
+2.4 [x] Client join 세션
+2.5 [ ] Lobby active 세션
+2.6 [ ] gameplay start 세션
+2.7 [ ] strict cleanup 세션
 3. [ ] Host/Client lobby create/join 흐름 구현
 4. [ ] 2인 gameplay scene spawn 동기화
 5. [ ] boss aggro + spectator + retry consensus 구현
 6. [ ] `System_Blueprint`와 `Technical_Glossary`에 확정 구현 결과 반영
-
+7. [ ] (싱글, 멀티) 다시 플레이 만들기
 ---
 
 #### 🚧 버그
@@ -145,7 +159,9 @@
 - [ ] 🟡**(보스, 애니메이션) 2페이즈 생략**: 페이즈 변환할 때 때려도 페이즈변환 무시 안되게 하기.
 - [x] 🟢**(리포지토리) 보스 모델 공유 누락 수정**: `FourEvilDragonsPBR/DragonUsurper`의 `Red.prefab(.meta)`와 `UNI VFX`의 `Crushing Pull Gold.prefab(.meta)`만 `.gitignore` 예외로 허용하도록 규칙을 조정
 - [x] 🟢**(보스, 공격범위)**: Attack1 editable range source를 `HeadDamageCaster.radius`로 단일화하고, `BossController.basicAttackRange`는 인스펙터에서 숨김 + legacy fallback으로만 유지.
+- [ ] 🟢**(플레이어, UI) 데미지 끄기**: 보스 죽고 보스 때려도 때리는 UI 나오지 않게 하기
 - [ ] 🟢**(플레이어, UI)**: 3번째 공격 UI가 1초 느리게 나온다. 바로 바로 나오는 UI로 수정.
+- [ ] 🟢**(보스, Attack1) 첫공격만 준비동작 생략**: 첫공격도 준비동작 있게 하기
 ~~- [ ] 🟢**(보스) attack2 모델과 로직의 싱크**: 도약을 하면 부모 gameObject가 애니메이션을 못따라간다. (보류)~~
 - [ ] ~~🟢**(플레이어)**: PlayerController 인스펙터에서 HUD 켜고 끄는 체크박스 기능 만들기, HUD위치 Top center로 변환.~~
 
@@ -158,25 +174,28 @@
 - [x] 🔴**(보스) 피격 받는 중 공격 시전 유지**: 피격 애니메이션에 의해 공격 시전이 끊기지 않도록 하고, 데미지는 정상 반영.
 - [x] 🟡**(플레이어, 스턴) 리팩토링**: 넉백 길이 짧게 하기.
 - [x] 🟡**(보스, attack1) 준비동작 수치조절**: 인스펙터에서 준비 시간 & 어느 동작까지가 준비동작인지 인스펙터에서 조절 가능하게 만들기
+- [ ] 🟡**(플레이어, UI) 콤보**: 콤보 기능 넣기
 - [x] 🟢**지형 애셋 추가**: HQ Apocalyptic Environment 이 애셋을 이용해서 대체
 - [x] 🟢**하늘 애셋 추가**: Fantasy Skybox FREE 이 애셋을 이용해서 대체
-- [ ] 🟢**글씨 다르게 하기**: 글씨 다르게 하기
-- [ ] 🟢**(플레이어) 리팩토링**: DashState Enter(), input데이터 직접참조를 Update(Input) 여기서 받게 수정.
+- [x] 🟢**글씨 다르게 하기**: 글씨 다르게 하기
 - [x] 🟢**(게임매니저) 리팩토링**: Victory, GameOver TextArea로 만들기
-- [ ] 🟢**(UI) 움직임 추가**: Press Any Key 깜빡깜빡 효과 추가. fade in & out.
-- [ ] 🟢**(보스, UI) 리팩토링**: 플레이어가 detect range 안에 있을 때 보스의 체력 UI를 나타나게 하기
-- [ ] 🟢**(플레이어, UI) 리팩토링**: HUD 끄기
-- [ ] 🟢**(보스) Attack2 공격가능한 애니메이션**: 애니메이션에서 점프 후 때만 공격이 활성화 되게 하기
-- [ ] 🟢**(플레이어, 애니메이션) 맞는 모션 2개로 변경**: 맞는 모션을 2개로 해서 모션 다양하게 하기.
-- [ ] 🟢**(보스, 컴포넌트) 애니메이터 컴포넌트**: 프리팹은 프리팹만 있게 하기. 비주얼 로직은 비주얼 gameobject에 넣기
+- [x] 🟢**(플레이어, UI) 리팩토링**: HUD 끄기
+- [x] 🟢**(보스) Attack2 공격가능한 애니메이션**: 애니메이션에서 점프 후 때만 공격이 활성화 되게 하기
+- [x] 🟢**(보스, 컴포넌트) 애니메이터 컴포넌트**: 프리팹은 프리팹만 있게 하기. 비주얼 
+로직은 비주얼 gameobject에 넣기
+- [ ] 🟢**(플레이어, UI) 콤보 구현**: 때릴 때 콤보 넣게 하기
+- [ ] 🟡**(보스, 패턴 추가) 스프레이 불 추가**: attack5로 스프레이 불 넣기
 - [ ] ~~🟡**(보스) 회전 수정**: 플레이어를 항상 쳐다보는 것이 아닌 공격을 하기 전, 공격을 한 직후는 boss rotation 고정.~~
 - [ ] ~~🟡**(보스, attack5) attack4 형태를 한꺼번에 나오게 하기**: attack4가 하나씩 떨어졌다면 attack5는 한꺼번에 맵 전역에 떨어지게 하기.~~
 - [ ] ~~🟡**(보스) 패턴 3 투사체 조준 보정**: 플레이어가 드래곤 뒤쪽에 있어도 플레이어 방향으로 투사체 발사.~~
 - [ ] ~~🟡**다중 레이캐스트 탐지**: 눈 위치(몸통 1/2~머리 중간)에서 여러 방향 감지.~~
 - [ ] ~~🟢**(보스) Run/Walk 애니매이션 추가**: Run 애니메이션 추가 및 그에 맞는 보스 움직임 속도 부드럽게 증가시키기~~
 - [ ] ~~🟢**추적 알고리즘 검토**: NavMesh / A* 경로탐색 적용 여부 결정.~~
-~~- [ ] 🟢**(보스, VFX) 피격 플래시 이펙트**: `BaseVisual.FlashRoutine`을 Emission 기반으로 변경 (`material.SetColor("_EmissionColor")`) 또는 머티리얼 교체 방식 적용.~~
-
+- [ ] ~~🟢**(보스, VFX) 피격 플래시 이펙트**: `BaseVisual.FlashRoutine`을 Emission 기반으로 변경 (`material.SetColor("_EmissionColor")`) 또는 머티리얼 교체 방식 적용.~~
+- [ ] ~~🟢**(UI) 움직임 추가**: Press Any Key 깜빡깜빡 효과 추가. fade in & out.~~
+- [ ] ~~🟢**(플레이어) 리팩토링**: DashState Enter(), input데이터 직접참조를 Update(Input) 여기서 받게 수정.~~
+- [ ] ~~🟢**(플레이어, 애니메이션) 맞는 모션 2개로 변경**: 맞는 모션을 2개로 해서 모션 다양하게 하기.~~
+- [ ] ~~🟢**(보스, UI) 리팩토링**: 플레이어가 detect range 안에 있을 때 보스의 체력 UI를 나타나게 하기~~
 ---
 
 ### 📝 공통 문서화 작업

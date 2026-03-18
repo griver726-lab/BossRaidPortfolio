@@ -63,6 +63,9 @@ classDiagram
         +PlayerVisual Visual
         +Update()
         +SetCameraRoot(Transform)
+        +SetPendingComboHudStep(int)
+        +ShowComboHud(int)
+        +HideComboHud()
     }
 
     class BaseState {
@@ -94,11 +97,15 @@ classDiagram
         +Initialize(Health, Health)
         +SetPlayerName(string)
         +SetBossName(string)
+        +SetPartnerHudVisible(bool)
         +SetPlayerTorso(Sprite)
+        +ShowCombo(int)
+        +HideCombo()
         +ShowHud(bool)
         +ShowDamageFeedback(bool, int)
     }
     class DamageCaster {
+        +OnAttackHitConfirmed Action
         +OnAttackWindowResolved Action~bool,int~
         +EnableHitbox(int)
         +DisableHitbox()
@@ -381,6 +388,9 @@ classDiagram
 *   **Transition Router**: `Assets/Scripts/Common/SceneLoader.cs`
 *   **Loading Orchestrator**: `Assets/Scripts/Common/LoadingSceneController.cs`
 *   **Result & Restart**: `Assets/Scripts/Common/GameManager.cs`
+*   **Multiplayer Bootstrap Owner**: `Assets/Scripts/Multiplayer/Bootstrap/MultiplayerServicesBootstrap.cs`
+*   **Multiplayer Title Driver**: `Assets/Scripts/Multiplayer/UI/MultiplayerTitleSceneDriver.cs`
+*   **Multiplayer Scene Path Rule**: `Assets/Scripts/Multiplayer/SceneFlow/MultiplayerScenePaths.cs`
 
 ```mermaid
 classDiagram
@@ -415,6 +425,26 @@ classDiagram
         +Update()
     }
 
+    class MultiplayerTitleSceneDriver {
+        <<MonoBehaviour>>
+        +HandleCreateRoomSelectedAsync()
+        +HandleJoinRoomSelectedAsync()
+        +HandleStartSelected()
+    }
+
+    class MultiplayerServicesBootstrap {
+        <<MonoBehaviour>>
+        +EnsureInitializedAsync()
+        +IsReady bool
+        +PlayerId string
+    }
+
+    class MultiplayerScenePaths {
+        <<Static>>
+        +IsMultiplayerTitleScene(string) bool
+        +GamePlayScenePath string
+    }
+
     class GameManager {
         <<MonoBehaviour>>
         +ResolveGameOver(GameResult)
@@ -425,8 +455,14 @@ classDiagram
     TitleSceneController ..> SceneLoader : requests transition
     SceneLoader --> LoadingSceneController : reserves target
     LoadingSceneController ..> SceneLoader : consumes target/completes transition
+    MultiplayerTitleSceneDriver ..> TitleSceneController : wraps duplicated title scene buttons
+    MultiplayerTitleSceneDriver ..> MultiplayerServicesBootstrap : ensures bootstrap
+    MultiplayerTitleSceneDriver ..> MultiplayerScenePaths : loads duplicated gameplay path
     GameManager ..> SceneLoader : shares game flow context
 ```
+
+멀티플레이 duplicated title scene(`Assets/Scenes/mutiplayer/TitleScene.unity`)에서는 `MultiplayerTitleSceneRuntimeInstaller`가 runtime에만 `MultiplayerTitleSceneDriver`를 붙인다.
+이 driver는 `Create Room` / `Join` 전에 `MultiplayerServicesBootstrap`을 호출하고, `Solo Play` / Host `Start`는 common scene name 대신 duplicated scene path로 우회한다.
 
 ---
 
@@ -492,59 +528,59 @@ classDiagram
 
 ---
 
-## 4. Implementation Status Check
+## 4. Implementation Notes
 
 ### 4.1. Core Systems & Input
-| Component | Status | Note |
-| --- | --- | --- |
-| **IInputProvider** | ✅ Done | `LocalInputProvider.cs` 구현 완료. |
-| **Input Packet** | ✅ Done | `PlayerInputPacket` (Bit-packing) 적용 완료. |
-| **StateMachine** | ✅ Done | `BossRaid.Patterns` 네임스페이스 적용 및 구현 완료. |
-| **Physics System** | ✅ Done | `NonAlloc` 물리 판정(OverlapSphere) 및 최적화 완료. |
-| **Object Pooling** | ✅ Done | `BossProjectilePool` 기반 투사체 재사용(Prewarm/Max/Expand) 구현 완료. |
-| **Third-Person Camera Module** | ✅ Done | `Assets/Scripts/Camera/ThirdPersonCameraController.cs`를 메인 카메라 측 모듈로 분리해 카메라 설정을 카메라 오브젝트로 이동했다. |
-| **Package Baseline** | ✅ Done | Unity 2022.3 기준으로 package manifest 정리 및 lock 재생성 경로 복구 (`URP/VFX 14.0.12`, `TMP 추가`, Unity 6 전용 의존성 제거). |
-| **External Asset Distribution Policy** | ✅ Done | 런타임 실사용 에셋만 Git/LFS로 선별 추적한다. 기준은 GUID 의존성 폐쇄(씬/프리팹/설정의 직접+간접 참조)이며, `Assets/TextMesh Pro` 루트와 미사용 서드파티 리소스는 제외한다. Unity 참조 안정성을 위해 에셋과 `.meta`를 쌍으로 버전관리한다. |
+| Component | Note |
+| --- | --- |
+| **IInputProvider** | `LocalInputProvider.cs` 구현 완료. |
+| **Input Packet** | `PlayerInputPacket` (Bit-packing) 적용 완료. |
+| **StateMachine** | `BossRaid.Patterns` 네임스페이스 적용 및 구현 완료. |
+| **Physics System** | `NonAlloc` 물리 판정(OverlapSphere) 및 최적화 완료. |
+| **Object Pooling** | `BossProjectilePool` 기반 투사체 재사용(Prewarm/Max/Expand) 구현 완료. |
+| **Third-Person Camera Module** | `Assets/Scripts/Camera/ThirdPersonCameraController.cs`를 메인 카메라 측 모듈로 분리해 카메라 설정을 카메라 오브젝트로 이동했다. |
+| **Package Baseline** | Unity 2022.3 기준으로 package manifest 정리 및 lock 재생성 경로 복구 (`URP/VFX 14.0.12`, `TMP 추가`, Unity 6 전용 의존성 제거). |
+| **External Asset Distribution Policy** | 런타임 실사용 에셋만 Git/LFS로 선별 추적한다. 기준은 GUID 의존성 폐쇄(씬/프리팹/설정의 직접+간접 참조)이며, `Assets/TextMesh Pro` 루트와 미사용 서드파티 리소스는 제외한다. Unity 참조 안정성을 위해 에셋과 `.meta`를 쌍으로 버전관리한다. |
 
 ### 4.2. Player System
-| Component | Status | Note |
-| --- | --- | --- |
-| **Movement Logic** | ✅ Done | `MoveState`로 로직 이관 완료. |
-| **Dash Logic** | ✅ Done | Cooldown 및 Edge-triggering 기능 포함 구현 완료. |
-| **Jump Logic** | ✅ Done | `JumpState` 구현 완료. 현재 게임 디자인 기준 점프 입력 전환은 비활성(주석/F10 유지) 상태이며 필요 시 재활성 가능. |
-| **Camera Logic** | ✅ Done | `ThirdPersonCameraController`가 메인 카메라에서 `lookYaw/lookPitch`를 1차 입력으로 처리하고, `CameraRoot`를 관리한다. smoothing/auto-behind 데이터는 유지하되 현재 인스펙터 노출은 숨김 처리되어 있다. 기본 hidden smoothing 값은 `positionSmoothTime = 0.01f`, `rotationSmoothTime = 0.01f`다. |
-| **Attack Logic** | ✅ Done | `AttackState` 구현 완료. 콤보/캔슬/개별 데미지 지원. 상태 전환 시 `AttackState.Exit()`에서 히트박스를 강제 종료해 잔존 판정을 방지하며, `DamageCaster`는 0 데미지 윈도우를 무시한다. |
-| **Hit/Damage System** | ✅ Done | `IDamageable`, `DamageCaster`, `Health` + `IBossAttackHitReceiver` 기반 보스 공격 메타데이터 라우팅 구현 완료. 플레이어는 `StunState`/`Projectile Count Timer`/후속 무적 규칙을 사용하고, 보스는 공격 준비/실행 중 피격 모션을 무시한다. 플레이어/보스의 점멸은 공용 `BlinkWhiteEffect` 컴포넌트(`Assets/Scripts/Common/Visual/BlinkWhiteEffect.cs`)가 담당하며 `_BlinkWhite` 셰이더(`Assets/Shaders/BlinkWhiteLit.shader`)를 `MaterialPropertyBlock`으로 제어한다. |
-| **Asset Integration** | ✅ Done | `PlayerAnimator`의 `Hit/Attack1/2/3/Die` 상태 모션 재연결 완료(2026-02-21). |
-| **Environment Fix Guard (환경 오류 복구)** | ✅ Done | `Assets/Editor/PlayerAnimatorGuard.cs`로 환경 변경 시 발생하는 Animator 참조 오류를 자동 복구/검증한다. 필수 state/motion + 파라미터(`Speed` Float, `Hit` Trigger) 누락 점검, 모든 Layer + 중첩 StateMachine 재귀 순회, Locomotion BlendTree 자식 모션 검증, 중복 상태명 경고, 로드/임포트/이동/메뉴 경로를 지원하며 `Hit` 상태명은 `PlayerController.ANIM_STATE_HIT` 상수를 공용 참조한다. 추가로 `Attack1/2/3` 클립의 `OnHitStart/OnHitEnd` 이벤트 자동 보정 및 누락/순서 검증, `Tools/Validation/Fix Player Attack Events` 메뉴를 포함한다. |
+| Component | Note |
+| --- | --- |
+| **Movement Logic** | `MoveState`로 로직 이관 완료. |
+| **Dash Logic** | Cooldown 및 Edge-triggering 기능 포함 구현 완료. |
+| **Jump Logic** | `JumpState` 구현 완료. 현재 게임 디자인 기준 점프 입력 전환은 비활성(주석/F10 유지) 상태이며 필요 시 재활성 가능. |
+| **Camera Logic** | `ThirdPersonCameraController`가 메인 카메라에서 `lookYaw/lookPitch`를 1차 입력으로 처리하고, `CameraRoot`를 관리한다. smoothing/auto-behind 데이터는 유지하되 현재 인스펙터 노출은 숨김 처리되어 있다. 기본 hidden smoothing 값은 `positionSmoothTime = 0.01f`, `rotationSmoothTime = 0.01f`다. |
+| **Attack Logic** | `AttackState` 구현 완료. 콤보/캔슬/개별 데미지 지원. 상태 전환 시 `AttackState.Exit()`에서 히트박스를 강제 종료해 잔존 판정을 방지하며, `DamageCaster`는 0 데미지 윈도우를 무시한다. |
+| **Hit/Damage System** | `IDamageable`, `DamageCaster`, `Health` + `IBossAttackHitReceiver` 기반 보스 공격 메타데이터 라우팅 구현 완료. 플레이어는 `StunState`/`Projectile Count Timer`/후속 무적 규칙을 사용하고, 보스는 공격 준비/실행 중 피격 모션을 무시한다. 플레이어/보스의 점멸은 공용 `BlinkWhiteEffect` 컴포넌트(`Assets/Scripts/Common/Visual/BlinkWhiteEffect.cs`)가 담당하며 `_BlinkWhite` 셰이더(`Assets/Shaders/BlinkWhiteLit.shader`)를 `MaterialPropertyBlock`으로 제어한다. |
+| **Asset Integration** | `PlayerAnimator`의 `Hit/Attack1/2/3/Die` 상태 모션 재연결 완료(2026-02-21). |
+| **Environment Fix Guard (환경 오류 복구)** | `Assets/Editor/PlayerAnimatorGuard.cs`로 환경 변경 시 발생하는 Animator 참조 오류를 자동 복구/검증한다. 필수 state/motion + 파라미터(`Speed` Float, `Hit` Trigger) 누락 점검, 모든 Layer + 중첩 StateMachine 재귀 순회, Locomotion BlendTree 자식 모션 검증, 중복 상태명 경고, 로드/임포트/이동/메뉴 경로를 지원하며 `Hit` 상태명은 `PlayerController.ANIM_STATE_HIT` 상수를 공용 참조한다. 추가로 `Attack1/2/3` 클립의 `OnHitStart/OnHitEnd` 이벤트 자동 보정 및 누락/순서 검증, `Tools/Validation/Fix Player Attack Events` 메뉴를 포함한다. |
 
 ### 4.3. Boss System (The Dragon)
-| Component | Status | Note |
-| --- | --- | --- |
-| **Boss Logic (FSM)** | ✅ Done | `BossController` 상태 머신 (Idle, Combat, Searching, Dead) |
-| **Boss Sensors** | ✅ Done | `IsTargetInDetectionRange`(XZ 거리 기반) 단일 규칙으로 Idle/Searching 전투 진입을 처리한다. 장애물 LOS 센서는 제거됨 |
-| **Boss Navigation** | ✅ Done | `MoveTo` (추적 이동) 및 `RotateTowards` (회전) 로직 + AoE 공중 연출 중 Locomotion 시각 잠금 가드 + `ChaseReengageBuffer` 기반 히스테리시스 추적 |
-| **Boss Visuals** | ✅ Done | 구조 분리 및 Dragon Asset(Animator/BlendTree) 통합 완료. `PlayFlyForward` 폴백을 비행 계열로 정리해 Walk 혼입 방지. |
-| **Boss Combat** | 🔃 progress | `Pattern 1`(Basic), `Pattern 2`(Lunge), `Pattern 3`(Projectile: Flame Attack + Homing + Vertical Follow + VFX create/hit + hitReturnDelay + postFireRecovery/exitNormalizedTime) 완료. 패턴별 공격 사거리 분리(`Basic/Lunge/Projectile/AoE`) 및 거리 기반 패턴 후보 필터링, 최대 사거리 기반 추적 히스테리시스 반영. Basic 사거리 기준점은 `basicAttackRangeOrigin`(기본 씬: `HeadDamageCasterPlace`)으로 분리되었고, Attack1의 editable range source는 `HeadDamageCaster.radius`로 단일화됐다. `BossController.basicAttackRange`는 인스펙터에서 숨기고 legacy fallback 값으로만 유지한다. Attack1은 `BasicAttackSettings.readyDuration` + `readyNormalizedWindow`를 사용해 bite 준비 slice를 재생 시간 기준으로 튜닝하며, 준비 구간 동안 `HeadDamageCaster`를 닫고 준비 종료 후에만 판정을 연다. Boss 공격 `DamageCaster`는 로직 계층에 두고, `HeadDamageCasterPlace`/`BodyDamageCasterPlace`를 `_castCenter` 앵커로 사용한다. Lunge는 루트모션 브리지(`OnAnimatorMove -> ApplyLungeRootMotion`) + 시작 방향 고정 경로를 사용하며, 피격 활성 구간은 인스펙터 `damageCastNormalizedWindow`로 start/end를 튜닝한다. Phase1에서는 Basic/Lunge 동시 충족 시 Basic 우선 규칙을 적용한다. `Pattern 4`(AoE)는 fully red active window 반경 판정 + circle당 target 1회 타격 규칙으로 진행 중이다(늦게 진입한 target 포함, invul ignore는 소비하지 않음). |
-| **Attack2 PreLaunch Ground Lock** | 🔃 progress | `LungeAttackPattern` 구간 분기(`Windup/PreLaunch/Launch/Airborne/Land`) 및 `BossController` ground lock/stepOffset 제어, 마커 큐 누적/소비(`PreLaunchStart/Launch/Land`) + `normalizedTime` 폴백까지 코드 반영 완료. `launch/land` 정규화 시점은 `0.98` 상한으로 강제해 종료 전 Launch 미진입 구성을 차단하고, Relay의 `AnimEventSynth`로 이벤트 누락 시 동일 마커를 합성한다. 루트모션 적용은 Animator `deltaPosition` 기반 단일 추종을 유지한다. `[Attack2Landing]` 로그는 `MarkerPathWarn`, `GroundSnapMiss`, `GroundSnapSkipMaxDistance`, `RootMotionMove/RootMotionRelayProbe`, `SpatialProbe(player/boss/visual/red 좌표)`를 포함해 실패 원인/좌표 경로를 추적한다. 플레이어 쪽 `[Attack2PlayerY]` 로그도 추가돼 근접 피격 시 Y/grounded/충돌 플래그를 함께 추적한다. Unity 실플레이 회귀 검증(머리 탑승/발 꺼짐/착지 정렬)은 남아 있다. |
-| **Attack2 Inspector & Gizmo UX** | 🔃 progress | Attack2 `damageCastNormalizedWindow`가 기본 인스펙터에서 2핸들 게이지와 `Start/End` 숫자 필드로 노출된다. 판정 활성 시점 튜닝 UX는 반영됐고, broader Attack2 전용 timeline/gizmo 정리는 후속 작업으로 남아 있다. |
-| **Attack2 Repro Harness (Test Scene)** | ✅ Done | `GamePlayScene_TestResult` 로드 시 `BossAttack2ReproHarness`를 자동 생성해 플레이어를 보스 전방 재현 위치로 고정한다. 수동 착지지점 배치 없이 Attack2 위로 올라감 회귀를 반복 재현할 수 있다. |
+| Component | Note |
+| --- | --- |
+| **Boss Logic (FSM)** | `BossController` 상태 머신 (Idle, Combat, Searching, Dead) |
+| **Boss Sensors** | `IsTargetInDetectionRange`(XZ 거리 기반) 단일 규칙으로 Idle/Searching 전투 진입을 처리한다. 장애물 LOS 센서는 제거됨 |
+| **Boss Navigation** | `MoveTo` (추적 이동) 및 `RotateTowards` (회전) 로직 + AoE 공중 연출 중 Locomotion 시각 잠금 가드 + `ChaseReengageBuffer` 기반 히스테리시스 추적 |
+| **Boss Visuals** | 구조 분리 및 Dragon Asset(Animator/BlendTree) 통합 완료. `PlayFlyForward` 폴백을 비행 계열로 정리해 Walk 혼입 방지. |
+| **Boss Combat** | `Pattern 1`(Basic), `Pattern 2`(Lunge), `Pattern 3`(Projectile: Flame Attack + Homing + Vertical Follow + VFX create/hit + hitReturnDelay + postFireRecovery/exitNormalizedTime) 완료. 패턴별 공격 사거리 분리(`Basic/Lunge/Projectile/AoE`) 및 거리 기반 패턴 후보 필터링, 최대 사거리 기반 추적 히스테리시스 반영. Basic 사거리 기준점은 `basicAttackRangeOrigin`(기본 씬: `HeadDamageCasterPlace`)으로 분리되었고, Attack1의 editable range source는 `HeadDamageCaster.radius`로 단일화됐다. `BossController.basicAttackRange`는 인스펙터에서 숨기고 legacy fallback 값으로만 유지한다. Attack1은 `BasicAttackSettings.readyDuration` + `readyNormalizedWindow`를 사용해 bite 준비 slice를 재생 시간 기준으로 튜닝하며, 준비 구간 동안 `HeadDamageCaster`를 닫고 준비 종료 후에만 판정을 연다. Boss 공격 `DamageCaster`는 로직 계층에 두고, `HeadDamageCasterPlace`/`BodyDamageCasterPlace`를 `_castCenter` 앵커로 사용한다. Lunge는 루트모션 브리지(`OnAnimatorMove -> ApplyLungeRootMotion`) + 시작 방향 고정 경로를 사용하며, 피격 활성 구간은 인스펙터 `damageCastNormalizedWindow`로 start/end를 튜닝한다. Phase1에서는 Basic/Lunge 동시 충족 시 Basic 우선 규칙을 적용한다. `Pattern 4`(AoE)는 fully red active window 반경 판정 + circle당 target 1회 타격 규칙으로 진행 중이다(늦게 진입한 target 포함, invul ignore는 소비하지 않음). |
+| **Attack2 PreLaunch Ground Lock** | `LungeAttackPattern` 구간 분기(`Windup/PreLaunch/Launch/Airborne/Land`) 및 `BossController` ground lock/stepOffset 제어, 마커 큐 누적/소비(`PreLaunchStart/Launch/Land`) + `normalizedTime` 폴백까지 코드 반영 완료. `launch/land` 정규화 시점은 `0.98` 상한으로 강제해 종료 전 Launch 미진입 구성을 차단하고, Relay의 `AnimEventSynth`로 이벤트 누락 시 동일 마커를 합성한다. 루트모션 적용은 Animator `deltaPosition` 기반 단일 추종을 유지한다. `[Attack2Landing]` 로그는 `MarkerPathWarn`, `GroundSnapMiss`, `GroundSnapSkipMaxDistance`, `RootMotionMove/RootMotionRelayProbe`, `SpatialProbe(player/boss/visual/red 좌표)`를 포함해 실패 원인/좌표 경로를 추적한다. 플레이어 쪽 `[Attack2PlayerY]` 로그도 추가돼 근접 피격 시 Y/grounded/충돌 플래그를 함께 추적한다. Unity 실플레이 회귀 검증(머리 탑승/발 꺼짐/착지 정렬)은 남아 있다. |
+| **Attack2 Inspector & Gizmo UX** | Attack2 `damageCastNormalizedWindow`가 기본 인스펙터에서 2핸들 게이지와 `Start/End` 숫자 필드로 노출된다. 판정 활성 시점 튜닝 UX는 반영됐고, broader Attack2 전용 timeline/gizmo 정리는 후속 작업으로 남아 있다. |
+| **Attack2 Repro Harness (Test Scene)** | `GamePlayScene_TestResult` 로드 시 `BossAttack2ReproHarness`를 자동 생성해 플레이어를 보스 전방 재현 위치로 고정한다. 수동 착지지점 배치 없이 Attack2 위로 올라감 회귀를 반복 재현할 수 있다. |
 
 ### 4.4. User Interface (UI)
-| Component | Status | Note |
-| --- | --- | --- |
-| **UI System** | ✅ Done | 전투 HUD 배치 + `CombatHUDController` 연동 완료. `Health.OnDamageTaken/OnDeath` 이벤트로 플레이어/보스 HP Fill을 즉시 갱신하고, `DamageCaster.OnAttackWindowResolved` 결과를 `HIT + 피해량` 고정형 피드백(스케일 강조 후 짧은 페이드 아웃)으로 표시한다. 이름 라벨(`Player`, `Dragon`) 및 `ShowHud(bool)` 기반 전체 표시 제어를 포함한다. |
-| **Title Multiplayer UI** | 🔃 progress | `TitleSceneController`가 기존 캔버스 위에 `TitleMainPanel / MultiplayerModePanel / HostCreatePanel / ClientJoinPanel / LobbyPanel / WrongKeyPopup`을 구성한다. 현재 단계는 UI 프로토타입이며, Host는 auto room title + random join code + 2초 `Start` unlock gate를 표시하고, Client는 6자리 join code 형식 검증과 wrong key popup만 처리한다. 추가로 `ExecuteAlways` + existing-root rebind 경로를 통해 `TitleRuntimeRoot`를 Edit Mode에서도 생성/재사용하므로, Unity Editor에서 패널 배치를 직접 조정한 뒤 같은 오브젝트를 Play Mode에서도 이어서 사용한다. 실제 `Relay / Lobby / NGO` 서비스 연동은 후속 작업이다. |
+| Component | Note |
+| --- | --- |
+| **UI System** | 전투 HUD 배치 + `CombatHUDController` 연동 완료. `Health.OnDamageTaken/OnDeath` 이벤트로 플레이어/보스 HP Fill을 즉시 갱신하고, `DamageCaster.OnAttackWindowResolved` 결과를 `HIT + 피해량` 고정형 피드백(스케일 강조 후 짧은 페이드 아웃)으로 표시한다. 이름 라벨(`Player`, `Dragon`) 및 `ShowHud(bool)` 기반 전체 표시 제어를 포함한다. shared `Canvas.prefab`의 `PartnerHUD_Panel`은 기본적으로 숨기고, `PlayerController.InitializeCombatHUD()`가 `MultiplayerSessionService.HasActiveSession`이 true일 때만 `SetPartnerHudVisible(true)`로 연다. combo UI(`Text_Combo`)도 기본 hidden 상태를 유지하며, `AttackState.StartComboStep()`은 `PlayerController.SetPendingComboHudStep(step)`로 현재 단계만 준비하고, 실제 open은 `DamageCaster.OnAttackHitConfirmed` -> `PlayerController.ShowComboHud(step)` -> `CombatHUDController.ShowCombo(step)` 경로에서만 수행한다. `AttackState.Exit()` / `InitializeCombatHUD()` / `ShowHud(false)`는 `HideCombo()`로 stale combo UI를 정리한다. duplicated multiplayer title scene의 `Solo Play`도 duplicated multiplayer gameplay scene path로 들어갈 수 있으므로, partner HUD 표시 게이트는 scene path가 아니라 real session state를 truth source로 사용한다. current multiplayer gameplay scene(`Assets/Scenes/mutiplayer/GamePlayScene.unity`)은 promoted main gameplay scene content를 duplicate로 유지하며, `GameManager`는 scene binding이 비어 있어도 `GameOver_Panel` / `GameResult` text를 runtime에서 재탐색한다. |
+| **Title Multiplayer UI** | `TitleSceneController`가 기존 캔버스 위에 `TitleMainPanel / MultiplayerModePanel / HostCreatePanel / ClientJoinPanel / LobbyPanel / WrongKeyPopup`을 구성한다. main title scene의 UI 레이아웃은 그대로 두고, duplicated multiplayer title scene(`Assets/Scenes/mutiplayer/TitleScene.unity`)에서는 `MultiplayerTitleSceneRuntimeInstaller` + `MultiplayerTitleSceneDriver`가 runtime에만 붙는다. 이 driver는 Host `Create Room`과 Client `Join`을 모두 `MultiplayerSessionService`로 넘기고, service는 먼저 `MultiplayerServicesBootstrap` ready를 보장한 뒤 Host는 `Relay allocation -> join code -> Lobby create(metadata S1) -> NGO Host start`, Client는 `join code normalize -> Lobby query(S1) -> Lobby join -> Relay join -> NGO Client start`를 수행한다. 성공 시 `LobbyPanel`에는 real room title, real join code, real player count가 바인딩되고, wrong key는 `WrongKeyPopup`으로 되돌리며 그 외 실패와 `Cancel`은 strict cleanup 후 title로 돌아간다. duplicated multiplayer title scene manual Host smoke test에서는 `PlayerId ready`, `Host session started`, `Lobby heartbeat sent`, `Deleting lobby`, `Cleanup complete`까지 실제 로그로 확인됐다. `2/2` stable `Start` unlock 규칙은 아직 후속 작업이다. |
 
 ### 4.5. Game Logic & Flow
-| Component | Status | Note |
-| --- | --- | --- |
-| **Game Loop** |  ✅ Done | `TitleSceneController`가 `Solo Play / Multi Play` 버튼 기반 시작 흐름을 관리하고, `SceneLoader` + `LoadingSceneController` 경유 전투 진입/`GameManager` 결과 처리까지 연결한다. Solo는 기존 전투 진입 흐름을 유지하고, Multi는 Host/Client/Lobby 패널 전환까지 UI 프로토타입으로 제공한다. `GamePlayScene_TestResult` + `SimultaneousDeathTest`로 동시 사망 시 `Victory` 출력 검증을 완료했다. 일반 실플레이 회귀 시나리오 검증은 남아 있다. |
+| Component | Note |
+| --- | --- |
+| **Game Loop** | `TitleSceneController`가 `Solo Play / Multi Play` 버튼 기반 시작 흐름을 관리하고, main scene 기준으로는 `SceneLoader` + `LoadingSceneController` 경유 전투 진입/`GameManager` 결과 처리까지 연결한다. duplicated multiplayer title scene에서는 `MultiplayerScenePaths` 기반 path load를 사용해 `Assets/Scenes/mutiplayer/GamePlayScene.unity`로 직접 이동한다. Host create, Client join, lobby cancel/back까지는 real session flow가 연결됐고, 다음 단계는 lobby active 안정화와 gameplay start consensus다. |
 
 ### 4.6. Network Architecture
-| Component | Status | Note |
-| --- | --- | --- |
-| **Netcode Prep** | ⬜ Todo | 추후 `NetworkInputProvider`와 `Relay / Lobby / NGO` 서비스 초기화 계층을 추가할 예정. 현재 `TitleScene` 멀티 UI는 서비스 미연동 프로토타입 단계다. |
+| Component | Note |
+| --- | --- |
+| **Netcode Prep** | `Session 1 - Package Baseline`, `Session 2 - Services Bootstrap`, `Session 3 - Host Create`, `Session 4 - Client Join`까지 구현됐다. `MultiplayerServicesBootstrap`은 `UnityServices.InitializeAsync()` + anonymous sign-in + `PlayerId` 확보를 one-time init으로 묶고, `MultiplayerRuntimeRoot`는 `NetworkManager` + `UnityTransport` singleton owner를 맡는다. `MultiplayerSessionService`는 Host create 시 `Relay allocation -> join code -> Lobby create(metadata S1) -> UnityTransport host relay configure -> NGO StartHost()`, Client join 시 `join code normalize -> QueryLobbiesAsync(S1) -> JoinLobbyByIdAsync -> Relay JoinAllocationAsync -> UnityTransport client relay configure -> NGO StartClient()` 순서를 실행하며, wrong-key/fatal failure 구분, host heartbeat, strict shutdown, 그리고 Wire package가 있을 때만 활성화되는 optional lobby event subscription까지 관리한다. Session 3 Host create / cancel은 duplicated multiplayer title scene manual smoke test로 실제 검증됐고, 다음 단계는 Lobby active 안정화와 `Start` unlock rule이다. |
 
 ---
 
@@ -584,8 +620,8 @@ classDiagram
 
 
 ### 4.7. Compatibility Note (Unity 2022)
-| Component | Status | Note |
-| --- | --- | --- |
-| **AoE Heading Sampling** | ✅ Done | AoEAttackPattern의 타겟 속도 샘플링은 Unity 2022 기준 Rigidbody.velocity를 사용한다. |
-| **Editor Assembly Anchor** | ✅ Done | Assets/Editor/EditorAssemblyAnchor.cs를 통해 에디터 전용 어셈블리 생성 경로를 고정. |
-| **URP Global Settings Hygiene** | ✅ Done | GUID 스캔 기준 미해결 참조가 `Assets/Settings/UniversalRenderPipelineGlobalSettings.asset`에 49건 남아 있어, Unity 에디터에서 URP Global Settings 재생성/재할당 후 확정 커밋이 필요하다. |
+| Component | Note |
+| --- | --- |
+| **AoE Heading Sampling** | AoEAttackPattern의 타겟 속도 샘플링은 Unity 2022 기준 Rigidbody.velocity를 사용한다. |
+| **Editor Assembly Anchor** | Assets/Editor/EditorAssemblyAnchor.cs를 통해 에디터 전용 어셈블리 생성 경로를 고정. |
+| **URP Global Settings Hygiene** | GUID 스캔 기준 미해결 참조가 `Assets/Settings/UniversalRenderPipelineGlobalSettings.asset`에 49건 남아 있어, Unity 에디터에서 URP Global Settings 재생성/재할당 후 확정 커밋이 필요하다. |

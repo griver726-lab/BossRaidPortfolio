@@ -17,6 +17,7 @@ namespace Core.Combat
         /// bool: 적중 여부, int: 누적 피해량
         /// </summary>
         public event Action<bool, int> OnAttackWindowResolved;
+        public event Action OnAttackHitConfirmed;
 
         [Header("Settings")]
         [SerializeField] private float _radius = 1.0f;
@@ -34,6 +35,7 @@ namespace Core.Combat
         private int _damagePayload = 0;
         private int _attackWindowTotalDamage = 0;
         private bool _attackWindowOpen = false;
+        private bool _attackWindowHasConfirmedHit = false;
 
         public float Radius => Mathf.Max(0f, _radius);
 
@@ -86,6 +88,7 @@ namespace Core.Combat
 
             _attackWindowTotalDamage = 0;
             _attackWindowOpen = true;
+            _attackWindowHasConfirmedHit = false;
         }
 
         /// <summary>
@@ -102,6 +105,7 @@ namespace Core.Combat
 
             _attackWindowOpen = false;
             _attackWindowTotalDamage = 0;
+            _attackWindowHasConfirmedHit = false;
         }
 
         /// <summary>
@@ -217,6 +221,13 @@ namespace Core.Combat
 
                     if (didDamage)
                     {
+                        if (!_attackWindowHasConfirmedHit)
+                        {
+                            // 콤보 UI는 실제 유효 타격이 확인된 순간에만 열어야 한다.
+                            _attackWindowHasConfirmedHit = true;
+                            OnAttackHitConfirmed?.Invoke();
+                        }
+
                         _attackWindowTotalDamage += _damagePayload;
                     }
                     _hitTargets.Add(realTargetID); // 실제 대상 ID 등록
@@ -253,6 +264,7 @@ namespace Core.Combat
             _damagePayload = 0;
             _attackWindowOpen = false;
             _attackWindowTotalDamage = 0;
+            _attackWindowHasConfirmedHit = false;
             _hitTargets.Clear();
         }
     }

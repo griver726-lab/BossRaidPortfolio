@@ -97,6 +97,7 @@ public class PlayerController : MonoBehaviour, IDashContext, IAttackable, IBossA
     private float _nextAttack2StunDebugLogTime;
     private bool _wasAttack2NearLastFrame;
     private Core.Boss.BossController _attack2DebugBoss;
+    private int _pendingComboHudStep;
 
     // Public Properties for States
     public float MoveSpeed => moveSpeed;
@@ -159,6 +160,7 @@ public class PlayerController : MonoBehaviour, IDashContext, IAttackable, IBossA
         {
             _damageCaster.SetOwner(gameObject);
             _damageCaster.ForceDisableHitbox();
+            _damageCaster.OnAttackHitConfirmed += HandleAttackHitConfirmed;
             _damageCaster.OnAttackWindowResolved += HandleAttackWindowResolved;
         }
 
@@ -183,6 +185,7 @@ public class PlayerController : MonoBehaviour, IDashContext, IAttackable, IBossA
 
         if (_damageCaster != null)
         {
+            _damageCaster.OnAttackHitConfirmed -= HandleAttackHitConfirmed;
             _damageCaster.OnAttackWindowResolved -= HandleAttackWindowResolved;
         }
     }
@@ -267,6 +270,7 @@ public class PlayerController : MonoBehaviour, IDashContext, IAttackable, IBossA
 
         blinkWhiteEffect?.StopBlink();
         UpdateHealthInvincibilityByState();
+        HideComboHud();
         _stateMachine.ChangeState(DeadState);
     }
 
@@ -528,6 +532,32 @@ public class PlayerController : MonoBehaviour, IDashContext, IAttackable, IBossA
         _combatHUD?.ShowDamageFeedback(isHit, totalDamage);
     }
 
+    private void HandleAttackHitConfirmed()
+    {
+        if (_pendingComboHudStep <= 0)
+        {
+            return;
+        }
+
+        ShowComboHud(_pendingComboHudStep);
+    }
+
+    public void SetPendingComboHudStep(int comboStep)
+    {
+        _pendingComboHudStep = Mathf.Max(1, comboStep);
+    }
+
+    public void ShowComboHud(int comboStep)
+    {
+        _combatHUD?.ShowCombo(comboStep);
+    }
+
+    public void HideComboHud()
+    {
+        _pendingComboHudStep = 0;
+        _combatHUD?.HideCombo();
+    }
+
     private void InitializeCombatHUD()
     {
         if (_combatHUD == null)
@@ -549,6 +579,7 @@ public class PlayerController : MonoBehaviour, IDashContext, IAttackable, IBossA
         _combatHUD.SetPlayerName(_playerDisplayName);
         _combatHUD.SetBossName(_bossDisplayName);
         _combatHUD.SetPartnerHudVisible(ShouldShowPartnerHud());
+        HideComboHud();
     }
 
     private static bool ShouldShowPartnerHud()
