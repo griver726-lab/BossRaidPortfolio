@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Reflection;
 using System.Threading.Tasks;
 using TMPro;
 using UnityEngine;
@@ -17,8 +16,7 @@ namespace Core.Multiplayer
         private const string CreateRoomButtonName = "Create RoomButton";
         private const string JoinRoomButtonName = "JoinButton";
         private const string StartButtonName = "StartButton";
-
-        private static readonly BindingFlags InstanceFlags = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
+        private const string CancelButtonName = "CancelButton";
 
         private readonly Dictionary<Button, bool> _buttonInteractableCache = new Dictionary<Button, bool>(16);
 
@@ -28,14 +26,12 @@ namespace Core.Multiplayer
         private Button _createRoomButton;
         private Button _joinRoomButton;
         private Button _startButton;
+        private Button _lobbyExitButton;
+        private TMP_Text _soloPlayButtonLabel;
         private TMP_Text _createRoomButtonLabel;
         private TMP_Text _joinRoomButtonLabel;
-        private MethodInfo _canAcceptMenuActionMethod;
-        private MethodInfo _handleCreateRoomMethod;
-        private MethodInfo _handleJoinRoomMethod;
-        private FieldInfo _requestedTransitionField;
-        private FieldInfo _popupMessageTextField;
-        private FieldInfo _wrongKeyPopupField;
+        private TMP_Text _lobbyExitButtonLabel;
+
         private bool _isBusy;
 
         private void Start()
@@ -46,16 +42,39 @@ namespace Core.Multiplayer
                 return;
             }
 
-            if (!TryBindTitleSceneController() || !TryBindReflectionMembers() || !TryBindSceneButtons())
+            if (!TryBindTitleSceneController())
             {
                 enabled = false;
                 return;
             }
 
+            if (!TryBindSceneButtons())
+            {
+                enabled = false;
+                return;
+            }
+
+            MultiplayerSessionService.Instance.SnapshotChanged += HandleSessionSnapshotChanged;
+            MultiplayerSessionService.Instance.FatalErrorOccurred += HandleFatalError;
+
             RebindButton(_soloPlayButton, HandleSoloPlaySelected);
             RebindButton(_createRoomButton, HandleCreateRoomSelectedAsync);
             RebindButton(_joinRoomButton, HandleJoinRoomSelectedAsync);
             RebindButton(_startButton, HandleStartSelected);
+            RebindButton(_lobbyExitButton, HandleLobbyExitSelectedAsync);
+
+            ApplySessionSnapshot(MultiplayerSessionService.Instance.CurrentSnapshot);
+        }
+
+        private void OnDestroy()
+        {
+            if (!MultiplayerSessionService.HasInstance)
+            {
+                return;
+            }
+
+            MultiplayerSessionService.Instance.SnapshotChanged -= HandleSessionSnapshotChanged;
+            MultiplayerSessionService.Instance.FatalErrorOccurred -= HandleFatalError;
         }
 
         private bool TryBindTitleSceneController()
@@ -68,31 +87,6 @@ namespace Core.Multiplayer
             }
 
             return true;
-        }
-
-        private bool TryBindReflectionMembers()
-        {
-            Type controllerType = _titleSceneController.GetType();
-            _canAcceptMenuActionMethod = controllerType.GetMethod("CanAcceptMenuAction", InstanceFlags);
-            _handleCreateRoomMethod = controllerType.GetMethod("HandleCreateRoomSelected", InstanceFlags);
-            _handleJoinRoomMethod = controllerType.GetMethod("HandleJoinRoomSelected", InstanceFlags);
-            _requestedTransitionField = controllerType.GetField("_requestedTransition", InstanceFlags);
-            _popupMessageTextField = controllerType.GetField("_popupMessageText", InstanceFlags);
-            _wrongKeyPopupField = controllerType.GetField("_wrongKeyPopup", InstanceFlags);
-
-            bool hasRequiredMembers = _canAcceptMenuActionMethod != null
-                                      && _handleCreateRoomMethod != null
-                                      && _handleJoinRoomMethod != null
-                                      && _requestedTransitionField != null
-                                      && _popupMessageTextField != null
-                                      && _wrongKeyPopupField != null;
-
-            if (!hasRequiredMembers)
-            {
-                Debug.LogError("MultiplayerTitleSceneDriver: Failed to bind TitleSceneController reflection members.");
-            }
-
-            return hasRequiredMembers;
         }
 
         private bool TryBindSceneButtons()
@@ -114,15 +108,22 @@ namespace Core.Multiplayer
             _createRoomButton = FindSceneButton(CreateRoomButtonName);
             _joinRoomButton = FindSceneButton(JoinRoomButtonName);
             _startButton = FindSceneButton(StartButtonName);
+            _lobbyExitButton = FindSceneButton(CancelButtonName);
+
+            _soloPlayButtonLabel = ResolveButtonLabel(_soloPlayButton);
             _createRoomButtonLabel = ResolveButtonLabel(_createRoomButton);
             _joinRoomButtonLabel = ResolveButtonLabel(_joinRoomButton);
+            _lobbyExitButtonLabel = ResolveButtonLabel(_lobbyExitButton);
 
             bool hasAllButtons = _soloPlayButton != null
                                  && _createRoomButton != null
                                  && _joinRoomButton != null
                                  && _startButton != null
+                                 && _lobbyExitButton != null
+                                 && _soloPlayButtonLabel != null
                                  && _createRoomButtonLabel != null
-                                 && _joinRoomButtonLabel != null;
+                                 && _joinRoomButtonLabel != null
+                                 && _lobbyExitButtonLabel != null;
 
             if (!hasAllButtons)
             {
@@ -164,7 +165,7 @@ namespace Core.Multiplayer
 
         private async void HandleCreateRoomSelectedAsync()
         {
-            if (_isBusy || !CanAcceptMultiplayerMenuAction())
+            if (_isBusy || !_titleSceneController.CanAcceptMultiplayerMenuAction())
             {
                 return;
             }
@@ -175,20 +176,22 @@ namespace Core.Multiplayer
 
             try
             {
-                await MultiplayerServicesBootstrap.Instance.EnsureInitializedAsync();
+                MultiplayerSessionService sessionService = MultiplayerSessionService.Instance;
+                await sessionService.CreateHostSessionAsync(_titleSceneController.ResolveHostRoomTitleForMultiplayer());
 
-                if (this == null || _titleSceneController == null)
+                if (this == null || !_titleSceneController)
                 {
                     return;
                 }
 
                 RestoreSceneButtons();
-                _handleCreateRoomMethod.Invoke(_titleSceneController, null);
+                ApplySessionSnapshot(sessionService.CurrentSnapshot);
             }
-            catch (Exception ex)
+            catch (Exception)
             {
                 RestoreSceneButtons();
-                ShowBootstrapErrorPopup(ex, "Host create failed. Please try again.");
+                _titleSceneController.ReturnToMainPanelFromMultiplayer();
+                ShowSessionErrorPopup("Host create failed. Please try again.");
             }
             finally
             {
@@ -199,7 +202,7 @@ namespace Core.Multiplayer
 
         private async void HandleJoinRoomSelectedAsync()
         {
-            if (_isBusy || !CanAcceptMultiplayerMenuAction())
+            if (_isBusy || !_titleSceneController.CanAcceptMultiplayerMenuAction())
             {
                 return;
             }
@@ -208,22 +211,33 @@ namespace Core.Multiplayer
             CacheAndLockSceneButtons();
             SetLabel(_joinRoomButtonLabel, "Connecting...");
 
+            MultiplayerSessionService sessionService = MultiplayerSessionService.Instance;
+
             try
             {
-                await MultiplayerServicesBootstrap.Instance.EnsureInitializedAsync();
+                await sessionService.JoinClientSessionAsync(_titleSceneController.ResolveClientJoinCodeForMultiplayer());
 
-                if (this == null || _titleSceneController == null)
+                if (this == null || !_titleSceneController)
                 {
                     return;
                 }
 
                 RestoreSceneButtons();
-                _handleJoinRoomMethod.Invoke(_titleSceneController, null);
+                ApplySessionSnapshot(sessionService.CurrentSnapshot);
             }
-            catch (Exception ex)
+            catch (Exception)
             {
                 RestoreSceneButtons();
-                ShowBootstrapErrorPopup(ex, "Client join failed. Please try again.");
+
+                if (sessionService.LastFailureKind == MultiplayerSessionFailureKind.WrongJoinCode)
+                {
+                    ShowSessionErrorPopup("Wrong key. Please type again.");
+                }
+                else
+                {
+                    _titleSceneController.ReturnToMainPanelFromMultiplayer();
+                    ShowSessionErrorPopup("Client join failed. Please try again.");
+                }
             }
             finally
             {
@@ -232,20 +246,59 @@ namespace Core.Multiplayer
             }
         }
 
-        private void HandleSoloPlaySelected()
+        private async void HandleLobbyExitSelectedAsync()
         {
-            if (_isBusy || !CanAcceptMultiplayerMenuAction())
+            if (_isBusy || !_titleSceneController.CanAcceptMultiplayerMenuAction())
             {
                 return;
             }
 
-            MarkSceneTransitionRequested();
+            _isBusy = true;
+            CacheAndLockSceneButtons();
+            SetLabel(_lobbyExitButtonLabel, "Closing...");
+
+            try
+            {
+                if (MultiplayerSessionService.Instance.HasActiveSession)
+                {
+                    await MultiplayerSessionService.Instance.ShutdownSessionAsync();
+                }
+
+                if (this == null || !_titleSceneController)
+                {
+                    return;
+                }
+
+                RestoreSceneButtons();
+                _titleSceneController.ReturnToMainPanelFromMultiplayer();
+            }
+            catch (Exception)
+            {
+                RestoreSceneButtons();
+                _titleSceneController.ReturnToMainPanelFromMultiplayer();
+                ShowSessionErrorPopup("Session close failed. Please try again.");
+            }
+            finally
+            {
+                SetLabel(_lobbyExitButtonLabel, "Cancel");
+                _isBusy = false;
+            }
+        }
+
+        private void HandleSoloPlaySelected()
+        {
+            if (_isBusy || !_titleSceneController.CanAcceptMultiplayerMenuAction())
+            {
+                return;
+            }
+
+            _titleSceneController.MarkSceneTransitionRequestedForMultiplayer();
             SceneManager.LoadScene(MultiplayerScenePaths.GamePlayScenePath);
         }
 
         private void HandleStartSelected()
         {
-            if (_isBusy || !CanAcceptMultiplayerMenuAction())
+            if (_isBusy || !_titleSceneController.CanAcceptMultiplayerMenuAction())
             {
                 return;
             }
@@ -255,19 +308,51 @@ namespace Core.Multiplayer
                 return;
             }
 
-            MarkSceneTransitionRequested();
+            _titleSceneController.MarkSceneTransitionRequestedForMultiplayer();
             SceneManager.LoadScene(MultiplayerScenePaths.GamePlayScenePath);
         }
 
-        private bool CanAcceptMultiplayerMenuAction()
+        private void HandleSessionSnapshotChanged(MultiplayerSessionSnapshot snapshot)
         {
-            object result = _canAcceptMenuActionMethod.Invoke(_titleSceneController, null);
-            return result is bool canAccept && canAccept;
+            ApplySessionSnapshot(snapshot);
         }
 
-        private void MarkSceneTransitionRequested()
+        private void HandleFatalError(string message)
         {
-            _requestedTransitionField.SetValue(_titleSceneController, true);
+            RestoreSceneButtons();
+            SetLabel(_createRoomButtonLabel, "Create Room");
+            SetLabel(_joinRoomButtonLabel, "Join");
+            SetLabel(_lobbyExitButtonLabel, "Cancel");
+            _isBusy = false;
+
+            if (_titleSceneController == null)
+            {
+                return;
+            }
+
+            _titleSceneController.ReturnToMainPanelFromMultiplayer();
+            _titleSceneController.ShowMultiplayerPopup(message);
+        }
+
+        private void ApplySessionSnapshot(MultiplayerSessionSnapshot snapshot)
+        {
+            if (_titleSceneController == null || !snapshot.HasActiveSession)
+            {
+                return;
+            }
+
+            _titleSceneController.ShowMultiplayerLobby(
+                snapshot.RoomTitle,
+                snapshot.JoinCode,
+                snapshot.ConnectedPlayerCount,
+                snapshot.IsHost,
+                snapshot.CanStart,
+                snapshot.LobbyStatusText);
+
+            if (_lobbyExitButtonLabel != null)
+            {
+                _lobbyExitButtonLabel.text = snapshot.IsHost ? "Cancel" : "Back";
+            }
         }
 
         private void CacheAndLockSceneButtons()
@@ -300,14 +385,15 @@ namespace Core.Multiplayer
             _buttonInteractableCache.Clear();
         }
 
-        private void ShowBootstrapErrorPopup(Exception exception, string fallbackMessage)
+        private void ShowSessionErrorPopup(string fallbackMessage)
         {
-            string errorMessage = MultiplayerServicesBootstrap.Instance.LastErrorMessage;
+            string errorMessage = MultiplayerSessionService.HasInstance
+                ? MultiplayerSessionService.Instance.LastErrorMessage
+                : string.Empty;
+
             if (string.IsNullOrEmpty(errorMessage))
             {
-                errorMessage = exception != null && exception.InnerException != null
-                    ? exception.InnerException.Message
-                    : exception != null ? exception.Message : string.Empty;
+                errorMessage = MultiplayerServicesBootstrap.Instance.LastErrorMessage;
             }
 
             if (string.IsNullOrEmpty(errorMessage))
@@ -315,17 +401,7 @@ namespace Core.Multiplayer
                 errorMessage = fallbackMessage;
             }
 
-            TMP_Text popupMessageText = _popupMessageTextField.GetValue(_titleSceneController) as TMP_Text;
-            if (popupMessageText != null)
-            {
-                popupMessageText.text = errorMessage;
-            }
-
-            GameObject wrongKeyPopup = _wrongKeyPopupField.GetValue(_titleSceneController) as GameObject;
-            if (wrongKeyPopup != null)
-            {
-                wrongKeyPopup.SetActive(true);
-            }
+            _titleSceneController.ShowMultiplayerPopup(errorMessage);
         }
 
         private static void SetLabel(TMP_Text label, string value)

@@ -210,13 +210,14 @@ sequenceDiagram
     HostUI->>Net: StartHost()
     HostUI-->>HostUI: Show room title + join code
 
-    ClientUI->>Relay: Join allocation with join code
+    ClientUI->>Lobby: Query lobby by relay join code (`S1`)
     alt wrong key
-        Relay-->>ClientUI: Join failed
+        Lobby-->>ClientUI: Query empty
         ClientUI-->>ClientUI: Show Wrong key popup
     else correct key
-        Relay-->>ClientUI: Join success
+        Lobby-->>ClientUI: Lobby found
         ClientUI->>Lobby: Join lobby
+        ClientUI->>Relay: Join allocation with join code
         ClientUI->>Net: StartClient()
         Net-->>HostUI: Player connected 2/2
         HostUI-->>HostUI: Enable Start after stable 2s
@@ -226,7 +227,7 @@ sequenceDiagram
 
 ### 5.1. 잘못된 키 처리 (Wrong Key Handling)
 
-* Wrong key는 `invalid`, `expired`, `not found` 같은 Relay join 실패를 같은 UX로 묶어 처리한다.
+* Wrong key는 `query empty`, `invalid`, `expired`, `not found` 같은 Client join 실패를 같은 UX로 묶어 처리한다.
 * 사용자 문구는 단순하게 유지한다.
 * 기본 문구는 아래와 같다.
 

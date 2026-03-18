@@ -176,6 +176,7 @@ flowchart TD
 sequenceDiagram
     participant User as Host 플레이어
     participant UI as 타이틀 UI
+    participant SessionSvc as MultiplayerSessionService
     participant Lobby as Lobby 서비스
     participant Relay as Relay 서비스
     participant Net as NGO 런타임
@@ -186,21 +187,31 @@ sequenceDiagram
     UI->>UI: HostCreatePanel 표시
     User->>UI: room title 입력 또는 비움
     User->>UI: Create Room 선택
-    UI->>Lobby: lobby metadata 생성
-    UI->>Relay: allocation 생성
-    Relay-->>UI: join code 반환
-    UI->>Net: StartHost()
+    UI->>SessionSvc: CreateHostSessionAsync(roomTitle)
+    SessionSvc->>Relay: allocation 생성
+    Relay-->>SessionSvc: join code 반환
+    SessionSvc->>Lobby: relay join code 포함 lobby metadata 생성
+    SessionSvc->>Net: StartHost()
+    SessionSvc-->>UI: room title + join code + 1/2 connected
     UI->>UI: LobbyPanel 표시
-    UI->>UI: room title + join code + 1/2 connected 표시
+    UI->>UI: waiting text + host-only Start 표시
 ```
 
 Host 흐름 규칙:
 
 1. Host는 room title을 입력하거나 비워 둘 수 있다.
-2. UI는 먼저 room metadata를 만든다.
-3. UI는 Relay join code를 받는다.
-4. UI는 host 네트워크 런타임을 시작한다.
-5. UI는 `LobbyPanel`로 이동한다.
+2. UI는 `Create Room` 입력을 `MultiplayerSessionService`에 전달한다.
+3. session service는 먼저 Relay allocation을 만든다.
+4. session service는 real Relay join code를 먼저 받는다.
+5. session service는 그 code를 Lobby metadata에 저장하며 lobby를 만든다.
+6. session service는 host 네트워크 런타임을 시작한다.
+7. UI는 session snapshot을 받아 `LobbyPanel`로 이동한다.
+
+현재 구현 메모:
+
+* duplicated multiplayer title scene에서는 이 Host path가 실제로 연결돼 있다.
+* `Cancel`은 active session이 있을 때 `ShutdownSessionAsync()`를 호출한다.
+* Client join path도 이제 같은 runtime driver를 통해 실제 session service로 연결돼 있다.
 
 ### 6.2. Client 참가 흐름 (Client Join Flow)
 
@@ -208,8 +219,9 @@ Host 흐름 규칙:
 sequenceDiagram
     participant User as Client 플레이어
     participant UI as 타이틀 UI
-    participant Relay as Relay 서비스
+    participant SessionSvc as Session 서비스
     participant Lobby as Lobby 서비스
+    participant Relay as Relay 서비스
     participant Net as NGO 런타임
 
     User->>UI: Multi Play 선택
@@ -218,15 +230,16 @@ sequenceDiagram
     UI->>UI: ClientJoinPanel 표시
     User->>UI: join code 입력
     User->>UI: Join 선택
-    UI->>Relay: code로 allocation 참가
+    UI->>SessionSvc: JoinClientSessionAsync(joinCode)
+    SessionSvc->>Lobby: query by S1 + AvailableSlots
     alt wrong key
-        Relay-->>UI: Join 실패
-        UI->>UI: WrongKeyPopup 표시
+        Lobby-->>SessionSvc: Empty or stale lobby
+        SessionSvc-->>UI: WrongKeyPopup 표시
     else join success
-        Relay-->>UI: Join 성공
-        UI->>Lobby: lobby metadata 참가
-        UI->>Net: StartClient()
-        UI->>UI: LobbyPanel 표시
+        SessionSvc->>Lobby: Join lobby
+        SessionSvc->>Relay: Join allocation
+        SessionSvc->>Net: StartClient()
+        SessionSvc-->>UI: LobbyPanel 표시
     end
 ```
 
@@ -266,9 +279,10 @@ Lobby 준비 규칙:
 ### 6.4. Back / Cancel / Fail Flow
 
 1. Host가 `Back` 또는 `Cancel`을 누르면 세션을 닫고 `TitleMainPanel`로 돌아간다.
-2. create, join, start 중 하나라도 실패하면 세션을 닫고 `TitleMainPanel`로 돌아간다.
-3. Host가 나간 뒤 Client만 lobby에 남아 있지 않는다.
-4. 이번 버전은 reconnect를 지원하지 않는다.
+2. wrong key는 popup을 띄우고 `ClientJoinPanel`에 남긴다.
+3. 그 외 create, join, start fatal fail은 세션을 닫고 `TitleMainPanel`로 돌아간다.
+4. Host가 나간 뒤 Client만 lobby에 남아 있지 않는다.
+5. 이번 버전은 reconnect를 지원하지 않는다.
 
 ---
 
@@ -288,7 +302,7 @@ Lobby 준비 규칙:
 | `ClientJoinPanel` | `Wrong key` | `WrongKeyPopup` | 오버레이 팝업 |
 | `WrongKeyPopup` | `OK` | `ClientJoinPanel` | 가능하면 입력 상태 유지 |
 | `ClientJoinPanel` | `Back` | `MultiplayerModePanel` | 로컬 뒤로 가기 |
-| `ClientJoinPanel` | `Join fail` | `TitleMainPanel` | 즉시 세션 종료 |
+| `ClientJoinPanel` | `Join fail` | `TitleMainPanel` | wrong key를 제외한 fatal join fail만 해당 |
 | `LobbyPanel` | `Back/Cancel` | `TitleMainPanel` | 세션 종료 |
 | `LobbyPanel` | `Session fail` | `TitleMainPanel` | 세션 종료 |
 | `LobbyPanel` | `Host Start` | `LoadingScene` | 동기화된 로드 |

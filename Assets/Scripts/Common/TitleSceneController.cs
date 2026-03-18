@@ -954,6 +954,75 @@ namespace Core.GameFlow
             EventSystem.current?.SetSelectedGameObject(_wrongKeyPopup != null ? _wrongKeyPopup.GetComponentInChildren<Button>(true)?.gameObject : null);
         }
 
+        public bool CanAcceptMultiplayerMenuAction()
+        {
+            return CanAcceptMenuAction();
+        }
+
+        public string ResolveHostRoomTitleForMultiplayer()
+        {
+            return ResolveRoomTitle(_roomTitleInput != null ? _roomTitleInput.text : string.Empty);
+        }
+
+        public string ResolveClientJoinCodeForMultiplayer()
+        {
+            return _joinCodeInput != null ? _joinCodeInput.text : string.Empty;
+        }
+
+        public void ExecuteJoinRoomSelectedPrototypeForMultiplayer()
+        {
+            HandleJoinRoomSelected();
+        }
+
+        public void ShowMultiplayerLobby(string roomTitle, string joinCode, int connectedPlayerCount, bool isHost, bool canStart, string statusText)
+        {
+            _currentLobbyRole = isHost ? LobbyRole.Host : LobbyRole.Client;
+            _currentRoomTitle = roomTitle ?? string.Empty;
+            _currentJoinCode = joinCode ?? string.Empty;
+            _connectedPlayerCount = Mathf.Max(0, connectedPlayerCount);
+            _hostStartCountdownActive = false;
+            _hostStartTimer = 0f;
+
+            ShowPanel(TitlePanelState.Lobby);
+            UpdateLobbyVisuals();
+
+            if (_startButton != null)
+            {
+                _startButton.gameObject.SetActive(isHost);
+                _startButton.interactable = isHost && canStart;
+            }
+
+            if (_lobbyStatusText != null && !string.IsNullOrEmpty(statusText))
+            {
+                _lobbyStatusText.text = statusText;
+            }
+        }
+
+        public void ShowMultiplayerPopup(string message)
+        {
+            if (_popupMessageText != null)
+            {
+                _popupMessageText.text = string.IsNullOrEmpty(message) ? _wrongKeyMessage : message;
+            }
+
+            if (_wrongKeyPopup != null)
+            {
+                _wrongKeyPopup.SetActive(true);
+            }
+
+            EventSystem.current?.SetSelectedGameObject(_wrongKeyPopup != null ? _wrongKeyPopup.GetComponentInChildren<Button>(true)?.gameObject : null);
+        }
+
+        public void ReturnToMainPanelFromMultiplayer()
+        {
+            ShowMainPanel();
+        }
+
+        public void MarkSceneTransitionRequestedForMultiplayer()
+        {
+            _requestedTransition = true;
+        }
+
         private void CloseWrongKeyPopup()
         {
             if (_wrongKeyPopup != null)
