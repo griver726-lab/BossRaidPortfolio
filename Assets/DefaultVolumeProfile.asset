@@ -485,7 +485,7 @@ MonoBehaviour:
     m_Value: 0
   depthOfFieldFocalLength:
     m_OverrideState: 1
-    m_Value: 0.14
+    m_Value: 0.1
   depthOfFieldAperture:
     m_OverrideState: 1
     m_Value: 3
