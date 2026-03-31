@@ -3843,7 +3843,7 @@ MonoBehaviour:
     m_SelectedTrigger: Selected
     m_DisabledTrigger: Disabled
   m_Interactable: 1
-  m_TargetGraphic: {fileID: 0}
+  m_TargetGraphic: {fileID: 501914842}
   m_OnClick:
     m_PersistentCalls:
       m_Calls: []
@@ -3920,7 +3920,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!224 &522611060
 RectTransform:
   m_ObjectHideFlags: 0
@@ -6600,7 +6600,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: Create Room
+  m_text: Join Room
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: fffe5de162b506c47bf43cfe80083084, type: 2}
   m_sharedMaterial: {fileID: -4968491224749978818, guid: fffe5de162b506c47bf43cfe80083084, type: 2}
@@ -10484,7 +10484,7 @@ MonoBehaviour:
     m_SelectedTrigger: Selected
     m_DisabledTrigger: Disabled
   m_Interactable: 1
-  m_TargetGraphic: {fileID: 0}
+  m_TargetGraphic: {fileID: 1363827489}
   m_OnClick:
     m_PersistentCalls:
       m_Calls: []
@@ -23486,7 +23486,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!1 &9210947957848954016
 GameObject:
   m_ObjectHideFlags: 0
