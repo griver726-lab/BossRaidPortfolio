@@ -37,7 +37,7 @@ Material:
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _2nd_ShadeMap:
-        m_Texture: {fileID: 2800000, guid: bca0afcf30d20f149846535d2f8c144a, type: 3}
+        m_Texture: {fileID: 2800000, guid: 2fe47fc19671b7442ad57601d4726f5b, type: 3}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _AngelRing_Sampler:
@@ -109,7 +109,7 @@ Material:
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _MainTex:
-        m_Texture: {fileID: 2800000, guid: bca0afcf30d20f149846535d2f8c144a, type: 3}
+        m_Texture: {fileID: 2800000, guid: 2fe47fc19671b7442ad57601d4726f5b, type: 3}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _MaskMap:
@@ -441,8 +441,8 @@ Material:
     - _utsVersionY: 11
     - _utsVersionZ: 0
     m_Colors:
-    - _1st_ShadeColor: {r: 0.63027024, g: 0.47058824, b: 0.6431373, a: 1}
-    - _2nd_ShadeColor: {r: 0.41336152, g: 0.33333334, b: 0.42352942, a: 1}
+    - _1st_ShadeColor: {r: 0.58431375, g: 0.5254902, b: 0.52156866, a: 1}
+    - _2nd_ShadeColor: {r: 0.35686275, g: 0.32156864, b: 0.3372549, a: 1}
     - _AngelRingMaskColor: {r: 0, g: 1, b: 0, a: 1}
     - _AngelRing_Color: {r: 1, g: 1, b: 1, a: 1}
     - _Ap_RimLightColor: {r: 1, g: 1, b: 1, a: 1}
